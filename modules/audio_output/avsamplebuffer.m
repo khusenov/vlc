@@ -207,7 +207,7 @@ customBlock_Free(void *refcon, void *doomedMemoryBlock, size_t sizeInBytes)
     (void) sizeInBytes;
 }
 
-- (CMSampleBufferRef)wrapBuffer:(block_t *)block
+- (CMSampleBufferRef)wrapBuffer:(block_t *)block pts:(int64_t)ptsSamples
 {
     const CMBlockBufferCustomBlockSource blockSource = {
         .version = kCMBlockBufferCustomBlockSourceVersion,
@@ -230,7 +230,7 @@ customBlock_Free(void *refcon, void *doomedMemoryBlock, size_t sizeInBytes)
 
     const CMSampleTimingInfo timeInfo = {
         .duration = kCMTimeInvalid,
-        .presentationTimeStamp = CMTimeMake(_ptsSamples, _sampleRate),
+        .presentationTimeStamp = CMTimeMake(ptsSamples, _sampleRate),
         .decodeTimeStamp = kCMTimeInvalid,
     };
 
@@ -402,15 +402,21 @@ HostTimeFromTick(vlc_tick_t date)
         _outChainLast = &_outChain;
     block->p_next = NULL;
 
-    const int64_t samples = block->i_nb_samples;
-    CMSampleBufferRef buffer = [self wrapBuffer:block];
-    _ptsSamples += samples;
+    const int64_t pts = _ptsSamples;
+    _ptsSamples += block->i_nb_samples;
 
-    if (buffer == nil)
-        return;
-
-    [_renderer enqueueSampleBuffer:buffer];
-    CFRelease(buffer);
+    /* The first enqueue after a start or flush blocks for ~150 ms while macOS
+     * sets up spatialization and head tracking. Holding _bufferLock across it
+     * stalls time_get() on the decoder thread, which makes the core flush,
+     * which triggers the setup again, forever. */
+    vlc_mutex_unlock(&_bufferLock);
+    CMSampleBufferRef buffer = [self wrapBuffer:block pts:pts];
+    if (buffer != nil)
+    {
+        [_renderer enqueueSampleBuffer:buffer];
+        CFRelease(buffer);
+    }
+    vlc_mutex_lock(&_bufferLock);
 }
 
 - (void)whenDataReady
@@ -473,7 +479,6 @@ HostTimeFromTick(vlc_tick_t date)
     _sync.rate = 0.f;
 
     [_renderer stopRequestingMediaData];
-    [_renderer flush];
 
     _stopped = YES;
 
@@ -484,9 +489,10 @@ HostTimeFromTick(vlc_tick_t date)
     vlc_cond_signal(&_bufferWait);
     vlc_mutex_unlock(&_bufferLock);
 
-    /* stopRequestingMediaData and flush don't wait for an in-flight
-     * whenDataReady block, which may still be running on the data queue. */
+    /* stopRequestingMediaData doesn't wait for an in-flight whenDataReady
+     * block. Flush only once it is done, so no stale enqueue lands after. */
     dispatch_sync(_dataQueue, ^{});
+    [_renderer flush];
 }
 
 - (void)stop
