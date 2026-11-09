@@ -137,6 +137,9 @@ API_AVAILABLE(macos(MIN_MACOS))
 
     int64_t _ptsSamples;
     int64_t _writtenSamples;
+    int64_t _chainFrames;
+    int64_t _minChunkFrames;
+    BOOL _draining;
     vlc_tick_t _startDate;
     vlc_tick_t _pauseDate;
     BOOL _stopped;
@@ -229,7 +232,7 @@ customBlock_Free(void *refcon, void *doomedMemoryBlock, size_t sizeInBytes)
     }
 
     const CMSampleTimingInfo timeInfo = {
-        .duration = kCMTimeInvalid,
+        .duration = CMTimeMake(1, _sampleRate),
         .presentationTimeStamp = CMTimeMake(ptsSamples, _sampleRate),
         .decodeTimeStamp = kCMTimeInvalid,
     };
@@ -340,6 +343,9 @@ HostTimeFromTick(vlc_tick_t date)
         return;
     }
 
+    _draining = YES;
+    vlc_cond_signal(&_bufferWait);
+
     const vlc_tick_t deadline =
         mdate() + [self pendingTicksLocked] + VLC_TICK_FROM_MS(500);
 
@@ -363,6 +369,7 @@ HostTimeFromTick(vlc_tick_t date)
 
     _ptsSamples = -1;
     _writtenSamples = 0;
+    _draining = NO;
     _scheduled = NO;
     _startDate = VLC_TICK_INVALID;
 }
@@ -394,28 +401,46 @@ HostTimeFromTick(vlc_tick_t date)
     vlc_mutex_unlock(&_bufferLock);
 }
 
-- (void)enqueueNextBlockLocked
+- (void)enqueueNextChunkLocked
 {
-    block_t *block = _outChain;
-    _outChain = block->p_next;
+    block_t *chunk = _outChain;
+    block_t **next = &_outChain;
+    int64_t frames = 0;
+    while (*next != NULL && frames < _minChunkFrames)
+    {
+        frames += (*next)->i_nb_samples;
+        next = &(*next)->p_next;
+    }
+
+    _outChain = *next;
+    *next = NULL;
     if (_outChain == NULL)
         _outChainLast = &_outChain;
-    block->p_next = NULL;
+    _chainFrames -= frames;
 
     const int64_t pts = _ptsSamples;
-    _ptsSamples += block->i_nb_samples;
+    _ptsSamples += frames;
 
     /* The first enqueue after a start or flush blocks for ~150 ms while macOS
      * sets up spatialization and head tracking. Holding _bufferLock across it
      * stalls time_get() on the decoder thread, which makes the core flush,
      * which triggers the setup again, forever. */
     vlc_mutex_unlock(&_bufferLock);
-    CMSampleBufferRef buffer = [self wrapBuffer:block pts:pts];
-    if (buffer != nil)
+
+    block_t *block = block_ChainGather(chunk);
+    if (block == NULL)
+        block_ChainRelease(chunk);
+    else
     {
-        [_renderer enqueueSampleBuffer:buffer];
-        CFRelease(buffer);
+        block->i_nb_samples = frames;
+        CMSampleBufferRef buffer = [self wrapBuffer:block pts:pts];
+        if (buffer != nil)
+        {
+            [_renderer enqueueSampleBuffer:buffer];
+            CFRelease(buffer);
+        }
     }
+
     vlc_mutex_lock(&_bufferLock);
 }
 
@@ -425,7 +450,9 @@ HostTimeFromTick(vlc_tick_t date)
 
     while (!_stopped)
     {
-        if (_outChain == NULL)
+        /* TrueHD decodes to 40-sample blocks. Enqueued one by one, they starve
+         * the renderer's audio queue and play as silence, so coalesce them. */
+        if (_chainFrames == 0 || (_chainFrames < _minChunkFrames && !_draining))
         {
             vlc_cond_wait(&_bufferWait, &_bufferLock);
             continue;
@@ -434,7 +461,7 @@ HostTimeFromTick(vlc_tick_t date)
         if (!_renderer.readyForMoreMediaData)
             break;
 
-        [self enqueueNextBlockLocked];
+        [self enqueueNextChunkLocked];
     }
 
     vlc_mutex_unlock(&_bufferLock);
@@ -460,6 +487,7 @@ HostTimeFromTick(vlc_tick_t date)
     }
 
     _writtenSamples += block->i_nb_samples;
+    _chainFrames += block->i_nb_samples;
     block_ChainLastAppend(&_outChainLast, block);
 
     vlc_cond_signal(&_bufferWait);
@@ -485,6 +513,7 @@ HostTimeFromTick(vlc_tick_t date)
     block_ChainRelease(_outChain);
     _outChain = NULL;
     _outChainLast = &_outChain;
+    _chainFrames = 0;
 
     vlc_cond_signal(&_bufferWait);
     vlc_mutex_unlock(&_bufferLock);
@@ -581,6 +610,9 @@ HostTimeFromTick(vlc_tick_t date)
     _paused = NO;
     _ptsSamples = -1;
     _writtenSamples = 0;
+    _chainFrames = 0;
+    _minChunkFrames = fmt->i_rate / 50;
+    _draining = NO;
     _startDate = VLC_TICK_INVALID;
     _pauseDate = VLC_TICK_INVALID;
     _sampleRate = fmt->i_rate;
