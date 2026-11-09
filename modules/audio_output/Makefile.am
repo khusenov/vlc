@@ -111,6 +111,13 @@ libauhal_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(aoutdir)' \
 if HAVE_OSX
 aout_LTLIBRARIES += libauhal_plugin.la
 endif
+libavsamplebuffer_plugin_la_SOURCES = audio_output/avsamplebuffer.m
+libavsamplebuffer_plugin_la_OBJCFLAGS = $(AM_OBJCFLAGS) -fobjc-arc
+libavsamplebuffer_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(aoutdir)' \
+	-Wl,-framework,Foundation,-framework,CoreMedia,-framework,AVFoundation
+if HAVE_OSX
+aout_LTLIBRARIES += libavsamplebuffer_plugin.la
+endif
 libaudiounit_ios_plugin_la_SOURCES = audio_output/audiounit_ios.m \
 	audio_output/coreaudio_common.c audio_output/coreaudio_common.h
 libaudiounit_ios_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(aoutdir)' \

@@ -63,6 +63,7 @@ $Id$
  * avformat: libavformat demuxer
  * avi: AVI file stream demuxer
  * avio: Access and Stream output module using libavformat network
+ * avsamplebuffer: AVSampleBufferAudioRenderer audio output for macOS, with Spatial Audio
  * ball: Augmented reality ball video filter module
  * bandlimited_resampler: Bandlimited interpolation audio resampler
  * blend: a picture filter that blends two pictures
