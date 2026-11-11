@@ -29,6 +29,7 @@
 #import "VLCMain.h"
 #import "VLCMainMenu.h"
 #import "VLCMainWindow.h"
+#import "VLCPictureInPictureController.h"
 #import "VLCPlaylist.h"
 #import "VLCPlaylistInfo.h"
 #import "VLCResumeDialogController.h"
@@ -338,10 +339,12 @@ static int InputEvent(vlc_object_t *p_this, const char *psz_var,
 
         [[o_main mainMenu] setPause];
         [[o_main mainWindow] setPause];
+        [[VLCPictureInPictureController sharedInstance] playbackStateChanged];
     } else {
         [[o_main mainMenu] setSubmenusEnabled: FALSE];
         [[o_main mainMenu] setPlay];
         [[o_main mainWindow] setPlay];
+        [[VLCPictureInPictureController sharedInstance] playbackStateChanged];
 
         if (state == PAUSE_S)
             [self releaseSleepBlockers];

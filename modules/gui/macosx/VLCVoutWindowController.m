@@ -26,6 +26,7 @@
 
 #import "CompatibilityFixes.h"
 #import "VLCVoutWindowController.h"
+#import "VLCPictureInPictureController.h"
 #import "VLCMain.h"
 #import "VLCMainWindow.h"
 #import "VLCVoutView.h"
@@ -224,7 +225,7 @@ void WindowClose(vout_window_t *p_wnd)
     if (p_wnd)
         o_current_window = [voutWindows objectForKey:[NSValue valueWithPointer:p_wnd]];
     
-    if (o_current_window == nil)
+    if (o_current_window == nil || o_current_window.inPictureInPicture)
         return;
     
     if (NSPointInRect([o_current_window mouseLocationOutsideOfEventStream],
@@ -374,6 +375,14 @@ void WindowClose(vout_window_t *p_wnd)
     [newVideoWindow setHasActiveVideo: YES];
     [voutWindows setObject:newVideoWindow forKey:[NSValue valueWithPointer:p_wnd]];
 
+    if (!videoWallpaper && var_InheritBool(getIntf(), "macosx-pip-autostart")
+        && !var_InheritBool(getIntf(), "fullscreen") && !var_GetBool(pl_Get(getIntf()), "fullscreen")) {
+        VLCVideoWindowCommon *pipWindow = newVideoWindow;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[VLCPictureInPictureController sharedInstance] enterPictureInPictureForWindow:pipWindow];
+        });
+    }
+
     [[VLCMain sharedInstance] setActiveVideoPlayback: YES];
     [[[VLCMain sharedInstance] mainWindow] setNonembedded:!mainWindowHasVideo];
 
@@ -420,6 +429,8 @@ void WindowClose(vout_window_t *p_wnd)
     // set active video to no BEFORE closing the window and exiting fullscreen
     // (avoid stopping playback due to NSWindowWillCloseNotification, preserving fullscreen state)
     [o_window setHasActiveVideo: NO];
+
+    [[VLCPictureInPictureController sharedInstance] videoWindowWillRemoveVout:o_window];
 
     // prevent visible extra window if in fullscreen
     NSDisableScreenUpdates();

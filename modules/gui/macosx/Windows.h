@@ -73,9 +73,11 @@ static const float f_min_video_height = 70.0;
 @property (readonly) BOOL windowShouldExitFullscreenWhenFinished;
 @property (readwrite, assign) NSRect previousSavedFrame;
 @property (nonatomic, readwrite, assign) NSSize nativeVideoSize;
+@property (nonatomic, readwrite) BOOL inPictureInPicture;
 
 - (void)setWindowLevel:(NSInteger)i_state;
 - (void)resizeWindow;
+- (BOOL)videoViewHiddenAfterPictureInPicture;
 
 - (NSRect)getWindowRectForProposedVideoViewSize:(NSSize)size;
 

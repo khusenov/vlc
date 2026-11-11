@@ -59,6 +59,8 @@ libmacosx_plugin_la_SOURCES = \
 	gui/macosx/Spotify.h \
 	gui/macosx/VLCStringUtility.h gui/macosx/VLCStringUtility.m \
 	gui/macosx/VLCVoutView.h gui/macosx/VLCVoutView.m \
+	gui/macosx/PIPSPI.h \
+	gui/macosx/VLCPictureInPictureController.h gui/macosx/VLCPictureInPictureController.m \
 	gui/macosx/VLCTimeSelectionPanelController.h gui/macosx/VLCTimeSelectionPanelController.m \
 	gui/macosx/VLCUIWidgets.h gui/macosx/VLCUIWidgets.m \
 	gui/macosx/VLCScrollingClipView.h gui/macosx/VLCScrollingClipView.m \

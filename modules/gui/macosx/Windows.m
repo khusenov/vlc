@@ -29,6 +29,7 @@
 #import "VLCVoutView.h"
 #import "CompatibilityFixes.h"
 #import "NSScreen+VLCAdditions.h"
+#import "VLCPictureInPictureController.h"
 
 /*****************************************************************************
  * VLCWindow
@@ -485,11 +486,16 @@
     return new_frame;
 }
 
+- (BOOL)videoViewHiddenAfterPictureInPicture
+{
+    return NO;
+}
+
 - (void)resizeWindow
 {
     // VOUT_WINDOW_SET_SIZE is triggered when exiting fullscreen. This event is ignored here
     // to avoid interference with the animation.
-    if ([self fullscreen] || _inFullscreenTransition)
+    if ([self fullscreen] || _inFullscreenTransition || self.inPictureInPicture)
         return;
 
     NSRect window_rect = [self getWindowRectForProposedVideoViewSize:self.nativeVideoSize];
@@ -499,6 +505,11 @@
 - (void)setNativeVideoSize:(NSSize)size
 {
     _nativeVideoSize = size;
+
+    if (self.inPictureInPicture) {
+        [[VLCPictureInPictureController sharedInstance] videoWindow:self nativeVideoSizeChanged:size];
+        return;
+    }
 
     if (var_InheritBool(getIntf(), "macosx-video-autoresize") && !var_InheritBool(getIntf(), "video-wallpaper"))
         [self resizeWindow];
@@ -510,7 +521,7 @@
         return proposedFrameSize;
 
     // needed when entering lion fullscreen mode
-    if (_inFullscreenTransition || [self fullscreen])
+    if (_inFullscreenTransition || [self fullscreen] || self.inPictureInPicture)
         return proposedFrameSize;
 
     if ([_videoView isHidden])
@@ -632,6 +643,8 @@
 
 - (void)windowWillEnterFullScreen:(NSNotification *)notification
 {
+    [[VLCPictureInPictureController sharedInstance] videoWindowWillEnterFullscreen:self];
+
     _windowShouldExitFullscreenWhenFinished = [[VLCMain sharedInstance] activeVideoPlayback];
 
     NSInteger i_currLevel = [self level];
@@ -760,6 +773,8 @@
     NSRect screen_rect;
     NSRect rect;
     BOOL blackout_other_displays = var_InheritBool(getIntf(), "macosx-black");
+
+    [[VLCPictureInPictureController sharedInstance] videoWindowWillEnterFullscreen:self];
 
     screen = [NSScreen screenWithDisplayID:(CGDirectDisplayID)var_InheritInteger(getIntf(), "macosx-vdev")];
 

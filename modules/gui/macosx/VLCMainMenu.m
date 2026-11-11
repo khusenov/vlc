@@ -51,6 +51,7 @@
 #import "VLCTimeSelectionPanelController.h"
 #import "NSScreen+VLCAdditions.h"
 #import "VLCRendererMenuController.h"
+#import "VLCPictureInPictureController.h"
 
 #ifdef HAVE_SPARKLE
 #import <Sparkle/Sparkle.h>
@@ -65,6 +66,8 @@
     NSTimer *_cancelRendererDiscoveryTimer;
 
     NSMenu *_playlistTableColumnsContextMenu;
+    NSMenuItem *_pictureInPictureItem;
+    NSMenuItem *_voutMenuPictureInPicture;
 
     __strong VLCTimeSelectionPanelController *_timeSelectionPanel;
 }
@@ -113,6 +116,7 @@
     intf_thread_t *p_intf = getIntf();
 
     [self initStrings];
+    [self setupPictureInPictureItems];
 
     key = config_GetPsz(p_intf, "key-quit");
     keyString = [NSString stringWithFormat:@"%s", key];
@@ -933,6 +937,32 @@
     [[VLCCoreInteraction sharedInstance] toggleFullscreen];
 }
 
+- (void)setupPictureInPictureItems
+{
+    if (![VLCPictureInPictureController isSupported])
+        return;
+
+    _pictureInPictureItem = [[NSMenuItem alloc] initWithTitle:_NS("Picture in Picture")
+                                                       action:@selector(togglePictureInPicture:)
+                                                keyEquivalent:@"p"];
+    [_pictureInPictureItem setKeyEquivalentModifierMask:NSEventModifierFlagCommand | NSEventModifierFlagControl];
+    [_pictureInPictureItem setTarget:self];
+    NSInteger videoIndex = [_videoMenu indexOfItem:_fullscreenItem];
+    [_videoMenu insertItem:_pictureInPictureItem atIndex:(videoIndex >= 0 ? videoIndex + 1 : [_videoMenu numberOfItems])];
+
+    _voutMenuPictureInPicture = [[NSMenuItem alloc] initWithTitle:_NS("Picture in Picture")
+                                                           action:@selector(togglePictureInPicture:)
+                                                    keyEquivalent:@""];
+    [_voutMenuPictureInPicture setTarget:self];
+    NSInteger voutIndex = [_voutMenu indexOfItem:_voutMenufullscreen];
+    [_voutMenu insertItem:_voutMenuPictureInPicture atIndex:(voutIndex >= 0 ? voutIndex + 1 : [_voutMenu numberOfItems])];
+}
+
+- (IBAction)togglePictureInPicture:(id)sender
+{
+    [[VLCPictureInPictureController sharedInstance] togglePictureInPicture];
+}
+
 - (IBAction)resizeVideoWindow:(id)sender
 {
     input_thread_t *p_input = pl_CurrentInput(getIntf());
@@ -1659,6 +1689,10 @@
         [mi setState: [[VLCCoreInteraction sharedInstance] mute] ? NSOnState : NSOffState];
         [self setupMenus]; /* Make sure audio menu is up to date */
         [self refreshAudioDeviceList];
+    } else if (mi == _pictureInPictureItem || mi == _voutMenuPictureInPicture) {
+        BOOL pipActive = [[VLCPictureInPictureController sharedInstance] isActive];
+        [mi setState:pipActive ? NSOnState : NSOffState];
+        enabled = pipActive || [[VLCMain sharedInstance] activeVideoPlayback];
     } else if (mi == _half_window           ||
                mi == _normal_window         ||
                mi == _double_window         ||

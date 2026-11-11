@@ -28,6 +28,7 @@
 #import "VLCMain.h"
 #import "applescript.h"
 #import "VLCCoreInteraction.h"
+#import "VLCPictureInPictureController.h"
 #import "VLCPlaylist.h"
 #import <vlc_url.h>
 
@@ -78,6 +79,8 @@
         [[VLCCoreInteraction sharedInstance] next];
     else if ([o_command isEqualToString:@"fullscreen"])
         [[VLCCoreInteraction sharedInstance] toggleFullscreen];
+    else if ([o_command isEqualToString:@"pip"])
+        [[VLCPictureInPictureController sharedInstance] togglePictureInPicture];
     else if ([o_command isEqualToString:@"mute"])
         [[VLCCoreInteraction sharedInstance] toggleMute];
     else if ([o_command isEqualToString:@"volumeUp"])
@@ -170,6 +173,16 @@
     }
     vlc_object_release(p_vout);
     [[VLCCoreInteraction sharedInstance] toggleFullscreen];
+}
+
+- (BOOL)scriptPictureInPictureMode {
+    return [[VLCPictureInPictureController sharedInstance] isActive];
+}
+
+- (void)setScriptPictureInPictureMode:(BOOL)mode {
+    VLCPictureInPictureController *pipController = [VLCPictureInPictureController sharedInstance];
+    if ([pipController isActive] != mode)
+        [pipController togglePictureInPicture];
 }
 
 - (BOOL) muted {

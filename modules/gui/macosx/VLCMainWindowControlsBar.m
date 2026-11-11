@@ -104,6 +104,14 @@
     [[[VLCMain sharedInstance] playlist] playbackModeUpdated];
 }
 
+- (NSView *)pictureInPictureButtonAnchorView
+{
+    NSView *buttonGroup = [self.fullscreenButton superview];
+    if (buttonGroup && buttonGroup != self.bottomBarView && [[buttonGroup subviews] containsObject:self.effectsButton])
+        return buttonGroup;
+    return self.fullscreenButton;
+}
+
 - (void)setBrightButtonImageSet
 {
     [super setBrightButtonImageSet];

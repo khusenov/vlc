@@ -41,6 +41,7 @@
 @interface NSApplication(ScriptSupport)
 
 @property (readwrite) BOOL scriptFullscreenMode;
+@property (readwrite) BOOL scriptPictureInPictureMode;
 @property (readwrite) int audioVolume;
 @property (readwrite) int audioDesync;
 @property (readwrite) int currentTime;

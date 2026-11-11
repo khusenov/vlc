@@ -469,6 +469,7 @@ modules/gui/macosx/NSScreen+VLCAdditions.h
 modules/gui/macosx/NSScreen+VLCAdditions.m
 modules/gui/macosx/NSSound+VLCAdditions.h
 modules/gui/macosx/NSSound+VLCAdditions.m
+modules/gui/macosx/PIPSPI.h
 modules/gui/macosx/SPMediaKeyTap.h
 modules/gui/macosx/SPMediaKeyTap.m
 modules/gui/macosx/Spotify.h
@@ -568,6 +569,8 @@ modules/gui/macosx/VLCPLItem.h
 modules/gui/macosx/VLCPLItem.m
 modules/gui/macosx/VLCPLModel.h
 modules/gui/macosx/VLCPLModel.m
+modules/gui/macosx/VLCPictureInPictureController.h
+modules/gui/macosx/VLCPictureInPictureController.m
 modules/gui/macosx/VLCPlaylist.h
 modules/gui/macosx/VLCPlaylist.m
 modules/gui/macosx/VLCPlaylistInfo.h

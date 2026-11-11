@@ -64,6 +64,7 @@
 
 - (IBAction)timeSliderAction:(id)sender;
 - (IBAction)fullscreen:(id)sender;
+- (NSView *)pictureInPictureButtonAnchorView;
 
 - (void)updateTimeSlider;
 - (void)updateControls;

@@ -323,7 +323,8 @@ static const float f_min_window_height = 307.;
         [[self animator] setFrame:new_frame display:YES animate:YES];
     }
 
-    [self.videoView setHidden:YES];
+    if (!self.inPictureInPicture)
+        [self.videoView setHidden:YES];
     [_splitView setHidden:NO];
     if (self.nativeFullscreenMode && [self fullscreen]) {
         [self showControlsBar];
@@ -342,16 +343,27 @@ static const float f_min_window_height = 307.;
         [self setContentMinSize: NSMakeSize(604., f_min_video_height)];
 
     [_splitView setHidden:YES];
-    [self.videoView setHidden:NO];
+    if (!self.inPictureInPicture)
+        [self.videoView setHidden:NO];
     if (self.nativeFullscreenMode && [self fullscreen]) {
         [self hideControlsBar];
         [self.fspanel setActive];
     }
 
-    if ([[self.videoView subviews] count] > 0)
+    if (!self.inPictureInPicture && [[self.videoView subviews] count] > 0)
         [self makeFirstResponder: [[self.videoView subviews] firstObject]];
 }
 
+
+- (BOOL)isVideoViewLogicallyHidden
+{
+    return self.inPictureInPicture ? ![_splitView isHidden] : [self.videoView isHidden];
+}
+
+- (BOOL)videoViewHiddenAfterPictureInPicture
+{
+    return ![_splitView isHidden];
+}
 
 - (void)changePlaylistState:(VLCPlaylistStateEvent)event
 {
@@ -403,14 +415,15 @@ static const float f_min_window_height = 307.;
         }
 
         if (!self.nonembedded) {
-            if (([self.videoView isHidden] && b_activeVideo) || b_restored || (b_activeVideo && event != psUserEvent))
+            if (([self isVideoViewLogicallyHidden] && b_activeVideo) || b_restored || (b_activeVideo && event != psUserEvent))
                 [self makeSplitViewHidden];
             else
                 [self makeSplitViewVisible];
         } else {
             [_splitView setHidden: NO];
             [_playlistScrollView setHidden: NO];
-            [self.videoView setHidden: YES];
+            if (!self.inPictureInPicture)
+                [self.videoView setHidden: YES];
             [self showControlsBar];
         }
     }
@@ -454,7 +467,7 @@ static const float f_min_window_height = 307.;
         id obj = [notification object];
 
         if ([obj class] == [VLCVideoWindowCommon class] || [obj class] == [VLCDetachedVideoWindow class] || ([obj class] == [VLCMainWindow class] && !self.nonembedded)) {
-            if ([[VLCMain sharedInstance] activeVideoPlayback])
+            if ([[VLCMain sharedInstance] activeVideoPlayback] && ![obj inPictureInPicture])
                 [[VLCCoreInteraction sharedInstance] pause];
         }
     }

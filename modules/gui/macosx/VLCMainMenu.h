@@ -257,6 +257,7 @@
 - (IBAction)selectRenderer:(id)sender;
 
 - (IBAction)toggleFullscreen:(id)sender;
+- (IBAction)togglePictureInPicture:(id)sender;
 - (IBAction)resizeVideoWindow:(id)sender;
 - (IBAction)floatOnTop:(id)sender;
 - (IBAction)createVideoSnapshot:(id)sender;

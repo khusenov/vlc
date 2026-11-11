@@ -23,6 +23,7 @@
  *****************************************************************************/
 
 #import "VLCControlsBarCommon.h"
+#import "VLCPictureInPictureController.h"
 #import "VLCMain.h"
 #import "VLCCoreInteraction.h"
 #import "VLCMainMenu.h"
@@ -48,6 +49,8 @@
     NSTimeInterval last_bwd_event;
     BOOL just_triggered_next;
     BOOL just_triggered_previous;
+
+    NSButton *_pictureInPictureButton;
 }
 @end
 
@@ -55,6 +58,7 @@
 
 - (void)dealloc
 {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     if (@available(macOS 10_14, *)) {
         [[NSApplication sharedApplication] removeObserver:self forKeyPath:@"effectiveAppearance"];
     }
@@ -120,10 +124,119 @@
 
     if (config_GetInt(getIntf(), "macosx-show-playback-buttons"))
         [self toggleForwardBackwardMode: YES];
+
+    [self setupPictureInPictureButton];
+}
+
+- (NSView *)pictureInPictureButtonAnchorView
+{
+    return self.fullscreenButton;
+}
+
+- (void)setupPictureInPictureButton
+{
+    if (![VLCPictureInPictureController isSupported])
+        return;
+
+    if (@available(macOS 11.0, *)) {
+        NSView *anchor = [self pictureInPictureButtonAnchorView];
+        NSView *container = [anchor superview];
+        if (!anchor || !container)
+            return;
+
+        NSLayoutConstraint *leadingConstraint = nil;
+        NSView *neighbor = nil;
+        CGFloat spacing = 0.;
+        for (NSLayoutConstraint *constraint in [container constraints]) {
+            if (constraint.relation != NSLayoutRelationEqual || constraint.multiplier != 1.)
+                continue;
+            BOOL firstIsLeading = constraint.firstAttribute == NSLayoutAttributeLeading || constraint.firstAttribute == NSLayoutAttributeLeft;
+            BOOL firstIsTrailing = constraint.firstAttribute == NSLayoutAttributeTrailing || constraint.firstAttribute == NSLayoutAttributeRight;
+            BOOL secondIsLeading = constraint.secondAttribute == NSLayoutAttributeLeading || constraint.secondAttribute == NSLayoutAttributeLeft;
+            BOOL secondIsTrailing = constraint.secondAttribute == NSLayoutAttributeTrailing || constraint.secondAttribute == NSLayoutAttributeRight;
+            if (constraint.firstItem == anchor && firstIsLeading && secondIsTrailing && [constraint.secondItem isKindOfClass:[NSView class]]) {
+                leadingConstraint = constraint;
+                neighbor = constraint.secondItem;
+                spacing = constraint.constant;
+                break;
+            }
+            if (constraint.secondItem == anchor && secondIsLeading && firstIsTrailing && [constraint.firstItem isKindOfClass:[NSView class]]) {
+                leadingConstraint = constraint;
+                neighbor = constraint.firstItem;
+                spacing = -constraint.constant;
+                break;
+            }
+        }
+        if (!leadingConstraint || !neighbor) {
+            msg_Warn(getIntf(), "controls bar layout not recognized, Picture in Picture button not added");
+            return;
+        }
+
+        NSButton *button = [[NSButton alloc] initWithFrame:NSZeroRect];
+        button.translatesAutoresizingMaskIntoConstraints = NO;
+        [button setButtonType:NSButtonTypeMomentaryPushIn];
+        [button setBordered:NO];
+        [button setImagePosition:NSImageOnly];
+        [button setTarget:self];
+        [button setAction:@selector(pictureInPicture:)];
+        [button setToolTip:_NS("Picture in Picture")];
+        [[button cell] accessibilitySetOverrideValue:[button toolTip] forAttribute:NSAccessibilityDescriptionAttribute];
+        _pictureInPictureButton = button;
+        [self updatePictureInPictureButtonImage];
+        if (![button image]) {
+            _pictureInPictureButton = nil;
+            return;
+        }
+
+        [container addSubview:button];
+        leadingConstraint.active = NO;
+        [NSLayoutConstraint activateConstraints:@[
+            [anchor.leadingAnchor constraintEqualToAnchor:button.trailingAnchor constant:spacing],
+            [button.leadingAnchor constraintEqualToAnchor:neighbor.trailingAnchor constant:spacing],
+            [button.centerYAnchor constraintEqualToAnchor:anchor.centerYAnchor],
+            [button.widthAnchor constraintEqualToConstant:29.],
+            [button.heightAnchor constraintEqualToConstant:23.],
+        ]];
+
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(pictureInPictureStateChanged:)
+                                                     name:VLCPictureInPictureStateChangedNotification
+                                                   object:nil];
+    }
+}
+
+- (void)pictureInPictureStateChanged:(NSNotification *)notification
+{
+    [self updatePictureInPictureButtonImage];
+}
+
+- (void)updatePictureInPictureButtonImage
+{
+    if (!_pictureInPictureButton)
+        return;
+
+    if (@available(macOS 11.0, *)) {
+        BOOL active = [[VLCPictureInPictureController sharedInstance] isActive];
+        NSImage *image = [NSImage imageWithSystemSymbolName:(active ? @"pip.exit" : @"pip.enter")
+                                   accessibilityDescription:_NS("Picture in Picture")];
+        NSImageSymbolConfiguration *configuration = [NSImageSymbolConfiguration configurationWithPointSize:13. weight:NSFontWeightMedium];
+        image = [image imageWithSymbolConfiguration:configuration];
+        [image setTemplate:YES];
+        [_pictureInPictureButton setImage:image];
+        [_pictureInPictureButton setContentTintColor:(_darkInterface ? [NSColor colorWithCalibratedWhite:0.85 alpha:1.]
+                                                                         : [NSColor colorWithCalibratedWhite:0.33 alpha:1.])];
+        [_pictureInPictureButton setToolTip:(active ? _NS("Exit Picture in Picture") : _NS("Picture in Picture"))];
+    }
+}
+
+- (IBAction)pictureInPicture:(id)sender
+{
+    [[VLCPictureInPictureController sharedInstance] togglePictureInPicture];
 }
 
 - (void)setBrightButtonImageSet
 {
+    [self updatePictureInPictureButtonImage];
     [self.backwardButton setImage: imageFromRes(@"backward-3btns")];
     [self.backwardButton setAlternateImage: imageFromRes(@"backward-3btns-pressed")];
     _playImage = imageFromRes(@"play");
@@ -148,6 +261,7 @@
 
 - (void)setDarkButtonImageSet
 {
+    [self updatePictureInPictureButtonImage];
     [self.backwardButton setImage: imageFromRes(@"backward-3btns-dark")];
     [self.backwardButton setAlternateImage: imageFromRes(@"backward-3btns-dark-pressed")];
     _playImage = imageFromRes(@"play_dark");

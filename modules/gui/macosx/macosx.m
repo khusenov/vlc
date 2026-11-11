@@ -57,6 +57,9 @@ void WindowClose  (vout_window_t *);
 #define OPAQUENESS_LONGTEXT N_("Set the transparency of the video output. 1 is non-transparent (default) " \
                                 "0 is fully transparent.")
 
+#define PIP_AUTOSTART_TEXT N_("Start video playback in Picture in Picture")
+#define PIP_AUTOSTART_LONGTEXT N_("Move the video into the system Picture in Picture window automatically whenever video playback starts, unless playback starts in fullscreen.")
+
 #define BLACK_TEXT N_("Black screens in fullscreen")
 #define BLACK_LONGTEXT N_("In fullscreen mode, keep screen where there is no " \
                           "video displayed black")
@@ -170,6 +173,7 @@ vlc_module_begin()
         add_bool("macosx-fspanel", true, FSPANEL_TEXT, FSPANEL_LONGTEXT, false)
         add_bool("macosx-video-autoresize", true, KEEPSIZE_TEXT, KEEPSIZE_LONGTEXT, false)
         add_bool("macosx-pause-minimized", false, PAUSE_MINIMIZED_TEXT, PAUSE_MINIMIZED_LONGTEXT, false)
+        add_bool("macosx-pip-autostart", false, PIP_AUTOSTART_TEXT, PIP_AUTOSTART_LONGTEXT, false)
         add_bool("macosx-lock-aspect-ratio", true, LOCK_ASPECT_RATIO_TEXT, LOCK_ASPECT_RATIO_TEXT, true)
         add_bool("macosx-dim-keyboard", false, DIM_KEYBOARD_PLAYBACK_TEXT, DIM_KEYBOARD_PLAYBACK_LONGTEXT, false)
         add_integer("macosx-control-itunes", 1, ITUNES_TEXT, ITUNES_LONGTEXT, false)
